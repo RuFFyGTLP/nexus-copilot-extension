@@ -1,0 +1,29 @@
+{
+    "manifest_version": 3,
+    "name": "Nexus AI Companion",
+    "version": "1.2",
+    "description": "Tu asistente de IA Nexus, siempre contigo.",
+    "permissions": [
+        "sidePanel",
+        "storage",
+        "activeTab",
+        "scripting",
+        "contextMenus"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "Abrir Nexus Co-Pilot"
+    },
+    "side_panel": {
+        "default_path": "sidebar.html"
+    },
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": false
+    }
+}
