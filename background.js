@@ -1,19 +1,26 @@
-// Background Service Worker for Nexus Co-Pilot
+/**
+ * Nexus Co-Pilot - Background Service Worker
+ * Handles context menus, keyboard shortcuts, and side panel management.
+ * @version 2.0
+ */
 
-// 1. Setup Context Menus on Install
+// ─── Side Panel Behavior ────────────────────────────────────────────────────
+
+// Enable opening the side panel by clicking the extension action button
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.error('[Nexus BG] sidePanel behavior error:', error));
+
+// ─── Context Menus ──────────────────────────────────────────────────────────
+
 chrome.runtime.onInstalled.addListener(() => {
-    // Enable opening side panel on icon click (Chrome 114+)
-    if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
-        chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-            .catch((error) => console.error("setPanelBehavior failed:", error));
-    }
-
+    // Root menu
     chrome.contextMenus.create({
         id: "nexus-root",
-        title: "Nexus AI",
+        title: "🧠 Nexus Co-Pilot",
         contexts: ["selection"]
     });
 
+    // Child actions
     chrome.contextMenus.create({
         parentId: "nexus-root",
         id: "nexus-explain",
@@ -34,37 +41,88 @@ chrome.runtime.onInstalled.addListener(() => {
         title: "🌐 Traducir al Español",
         contexts: ["selection"]
     });
+
+    chrome.contextMenus.create({
+        parentId: "nexus-root",
+        id: "nexus-improve",
+        title: "✨ Mejorar redacción",
+        contexts: ["selection"]
+    });
+
+    chrome.contextMenus.create({
+        parentId: "nexus-root",
+        id: "nexus-analyze-code",
+        title: "💻 Analizar código",
+        contexts: ["selection"]
+    });
+
+    console.log("[Nexus BG] Context menus created ✅");
 });
 
-// 2. Handle Context Menu Clicks
+// ─── Context Menu Handler ───────────────────────────────────────────────────
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId.startsWith("nexus-")) {
-        const text = info.selectionText;
-        let action = "";
+    if (!info.menuItemId.startsWith("nexus-") || info.menuItemId === "nexus-root") return;
 
-        switch (info.menuItemId) {
-            case "nexus-explain": action = "Explica este texto en detalle: "; break;
-            case "nexus-summarize": action = "Resume este texto en 3 puntos clave: "; break;
-            case "nexus-translate": action = "Traduce este texto al español con tono natural: "; break;
-        }
+    const text = info.selectionText;
+    if (!text) return;
 
-        const fullPrompt = `${action}"${text}"`;
-
-        // Open Side Panel (Chrome 114+)
-        chrome.sidePanel.open({ tabId: tab.id }).catch(() => {
-            // Fallback if sidePanel.open is not supported or fails
-            console.log("Side panel open via API not supported/allowed in this context.");
-        });
-
-        // Send message to Sidebar
-        // We need a small delay to ensure sidebar is open if we just opened it
-        setTimeout(() => {
-            chrome.runtime.sendMessage({
-                type: "NEXUS_CONTEXT_ACTION",
-                text: fullPrompt
-            });
-        }, 500);
+    let action = "";
+    switch (info.menuItemId) {
+        case "nexus-explain":
+            action = "Explica este texto en detalle: ";
+            break;
+        case "nexus-summarize":
+            action = "Resume este texto de forma concisa: ";
+            break;
+        case "nexus-translate":
+            action = "Traduce este texto al español: ";
+            break;
+        case "nexus-improve":
+            action = "Mejora la redacción de este texto manteniendo el significado: ";
+            break;
+        case "nexus-analyze-code":
+            action = "Analiza este código, explica qué hace y sugiere mejoras: ";
+            break;
+        default:
+            return;
     }
+
+    const fullPrompt = `${action}"${text}"`;
+
+    // Open Side Panel (Chrome 114+)
+    chrome.sidePanel.open({ tabId: tab.id }).catch(() => {
+        console.log("[Nexus BG] Side panel open not supported in this context.");
+    });
+
+    // Send message to Sidebar with small delay for panel to load
+    setTimeout(() => {
+        chrome.runtime.sendMessage({
+            type: "NEXUS_CONTEXT_ACTION",
+            text: fullPrompt
+        }).catch(() => {
+            // Sidebar might not be ready yet, retry once
+            setTimeout(() => {
+                chrome.runtime.sendMessage({
+                    type: "NEXUS_CONTEXT_ACTION",
+                    text: fullPrompt
+                }).catch(e => console.warn("[Nexus BG] Could not reach sidebar:", e));
+            }, 1000);
+        });
+    }, 500);
 });
 
+// ─── Keyboard Shortcut Handler ──────────────────────────────────────────────
+// The _execute_action command (Ctrl+Shift+K) automatically triggers the 
+// action button click, which opens the side panel thanks to 
+// setPanelBehavior({ openPanelOnActionClick: true }).
+// No additional handler needed for _execute_action.
+// This listener handles any CUSTOM commands we might add in the future.
 
+chrome.commands.onCommand.addListener((command) => {
+    console.log(`[Nexus BG] Command received: ${command}`);
+    // Future custom commands can go here
+});
+
+// ─── Log Boot ───────────────────────────────────────────────────────────────
+console.log("[Nexus BG] Background service worker v2.0 loaded ✅");

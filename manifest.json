@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Nexus AI Companion",
-    "version": "1.2",
-    "description": "Tu asistente de IA Nexus, siempre contigo.",
+    "version": "2.0",
+    "description": "Tu asistente de IA Nexus, siempre contigo. Arquitectura modular con seguridad integrada.",
     "permissions": [
         "sidePanel",
         "storage",
@@ -17,7 +17,16 @@
         "service_worker": "background.js"
     },
     "action": {
-        "default_title": "Abrir Nexus Co-Pilot"
+        "default_title": "Abrir Nexus Co-Pilot (Ctrl+Shift+K)"
+    },
+    "commands": {
+        "_execute_action": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+K",
+                "mac": "Command+Shift+K"
+            },
+            "description": "Abrir/cerrar Nexus Co-Pilot"
+        }
     },
     "side_panel": {
         "default_path": "sidebar.html"
