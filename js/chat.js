@@ -203,7 +203,14 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
         const text = textOverride || chatInput.value.trim();
         if (!text) return;
 
-        const config = await new Promise(r => chrome.storage.sync.get(DEFAULTS, r));
+        let config = DEFAULTS;
+        let endpoint = '';
+
+        try {
+            config = await new Promise(r => chrome.storage.sync.get(DEFAULTS, r));
+        } catch (e) {
+            console.warn('[Nexus] Could not load config, using defaults');
+        }
 
         if (!textOverride) {
             addMessage(messagesEl, 'user', text, false, config);
@@ -220,7 +227,7 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
 
         try {
             const provider = config.provider || 'nexus';
-            let endpoint = config.apiUrl ? config.apiUrl.replace(/\/$/, '') : 'http://localhost:3000';
+            endpoint = config.apiUrl ? config.apiUrl.replace(/\/$/, '') : 'http://localhost:3000';
             let payload = {};
 
             // Build system instruction
@@ -368,8 +375,32 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
                     loadingMsg.parentElement.parentElement.remove();
                 }
             }
-            console.error(e);
-            addMessage(messagesEl, 'assistant', `Error: ${e.message}`, false, DEFAULTS);
+            console.error('[Nexus Chat Error]', e);
+
+            // Build helpful error message
+            const provider = config?.provider || 'nexus';
+            let errorMsg = `❌ **Error de conexión**\n\n`;
+            errorMsg += `**Proveedor:** ${provider}\n`;
+            errorMsg += `**Endpoint:** ${endpoint || 'desconocido'}\n`;
+            errorMsg += `**Error:** ${e.message}\n\n`;
+
+            if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                errorMsg += `**💡 Posibles soluciones:**\n`;
+                if (provider === 'nexus') {
+                    errorMsg += `• Verifica que el servidor Nexus esté corriendo en la URL configurada\n`;
+                    errorMsg += `• Ejecuta: \`npm start\` en tu proyecto backend\n`;
+                } else if (provider === 'ollama') {
+                    errorMsg += `• Verifica que Ollama esté ejecutándose: \`ollama serve\`\n`;
+                    errorMsg += `• URL por defecto: \`http://localhost:11434\`\n`;
+                } else if (provider === 'lmstudio') {
+                    errorMsg += `• Verifica que LM Studio tenga el servidor local activo\n`;
+                    errorMsg += `• URL por defecto: \`http://localhost:1234\`\n`;
+                }
+                errorMsg += `• Abre ⚙️ Configuración y verifica la URL del proveedor\n`;
+                errorMsg += `• Si usas Docker, asegúrate de que los puertos estén expuestos`;
+            }
+
+            addMessage(messagesEl, 'assistant', errorMsg, false, config || DEFAULTS);
         } finally {
             if (btnStop) btnStop.classList.add('hidden');
             abortController = null;
