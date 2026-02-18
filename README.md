@@ -59,7 +59,7 @@ Una potente extensión de Chrome/Edge que te proporciona un asistente de IA dire
 
 1. Clona el repositorio:
 ```bash
-git clone https://github.com/german-ux/nexus-copilot-extension.git
+git clone https://github.com/RuFFyGTLP/nexus-copilot-extension.git
 ```
 
 2. Abre Chrome/Edge y ve a `chrome://extensions/`
