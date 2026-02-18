@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Nexus AI Co-Pilot — Docker Compose Stack
+# Provides the full backend infrastructure for the Chrome extension.
+#
+# Usage:
+#   docker compose up -d          → Start all services
+#   docker compose logs -f        → View logs
+#   docker compose down           → Stop all services
+#
+# After startup:
+#   1. Extension connects to http://localhost:3000 (Nexus provider)
+#   2. Ollama runs at http://localhost:11434
+#   3. A default model is pulled automatically on first run
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Ollama: AI Model Server ──────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexus-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Fallback for systems without GPU: comment out 'deploy' block above
+
+  # ── Model Bootstrap: Pull default model on first run ─────────────────────
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: nexus-ollama-init
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: "no"
+    entrypoint: >
+      sh -c "
+        echo '⏳ Waiting for Ollama to be ready...' &&
+        sleep 10 &&
+        echo '📦 Pulling default model: qwen2.5-coder:3b...' &&
+        curl -s http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5-coder:3b\"}' &&
+        echo '' &&
+        echo '✅ Model ready!'
+      "
+
+  # ── Nexus API: Middleware Backend ────────────────────────────────────────
+  nexus-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OLLAMA_URL=http://ollama:11434
+      - DEFAULT_MODEL=qwen2.5-coder:3b
+      - CORS_ORIGIN=*
+    depends_on:
+      ollama:
+        condition: service_started
+
+volumes:
+  ollama_data:
+    driver: local

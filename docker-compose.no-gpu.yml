@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Nexus AI Co-Pilot — Docker Compose (SIN GPU)
+# Usa este archivo si NO tienes GPU NVIDIA.
+#
+# Usage:
+#   docker compose -f docker-compose.no-gpu.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexus-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: nexus-ollama-init
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: "no"
+    entrypoint: >
+      sh -c "
+        echo '⏳ Waiting for Ollama...' &&
+        sleep 10 &&
+        echo '📦 Pulling qwen2.5-coder:3b (CPU mode)...' &&
+        curl -s http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5-coder:3b\"}' &&
+        echo '' &&
+        echo '✅ Model ready!'
+      "
+
+  nexus-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OLLAMA_URL=http://ollama:11434
+      - DEFAULT_MODEL=qwen2.5-coder:3b
+      - CORS_ORIGIN=*
+    depends_on:
+      ollama:
+        condition: service_started
+
+volumes:
+  ollama_data:
+    driver: local
