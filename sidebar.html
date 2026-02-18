@@ -95,10 +95,13 @@
                         <div style="display:flex; flex-wrap:wrap; gap:6px;">
                             <button class="profile-btn" data-profile="dev" title="Código experto">💻 Developer</button>
                             <button class="profile-btn" data-profile="speed" title="Respuesta rápida">⚡ Rápido</button>
-                            <button class="profile-btn" data-profile="creative" title="Escritura creativa">🎨 Creativo</button>
-                            <button class="profile-btn" data-profile="deep" title="Razonamiento profundo">🧠 Deep Think</button>
+                            <button class="profile-btn" data-profile="creative" title="Escritura creativa">🎨
+                                Creativo</button>
+                            <button class="profile-btn" data-profile="deep" title="Razonamiento profundo">🧠 Deep
+                                Think</button>
                         </div>
-                        <div id="profile-desc" class="hint" style="margin-top:8px; font-style:italic;">Selecciona un perfil para auto-configurar.</div>
+                        <div id="profile-desc" class="hint" style="margin-top:8px; font-style:italic;">Selecciona un
+                            perfil para auto-configurar.</div>
                     </div>
 
                     <div class="setting-card">
@@ -155,7 +158,8 @@
                         <h3>Personalización de Respuesta</h3>
                         <div class="form-group">
                             <label>Instrucciones Personalizadas (Lo que la IA debe saber de ti)</label>
-                            <textarea data-key="customInstructions" rows="3" placeholder="Ej: Soy programador junior, explícame con analogías. Prefiero respuestas cortas."></textarea>
+                            <textarea data-key="customInstructions" rows="3"
+                                placeholder="Ej: Soy programador junior, explícame con analogías. Prefiero respuestas cortas."></textarea>
                         </div>
                         <div class="form-group">
                             <label>Estilo de Respuesta</label>
@@ -187,8 +191,10 @@
                     <div class="setting-card">
                         <h3>Gestión de Configuración</h3>
                         <div class="flex-row">
-                            <button id="btn-export-config" class="icon-btn full-width" style="justify-content:center;">📤 Exportar Backup</button>
-                            <button id="btn-import-config" class="icon-btn full-width" style="justify-content:center;">📥 Importar Backup</button>
+                            <button id="btn-export-config" class="icon-btn full-width"
+                                style="justify-content:center;">📤 Exportar Backup</button>
+                            <button id="btn-import-config" class="icon-btn full-width"
+                                style="justify-content:center;">📥 Importar Backup</button>
                             <input type="file" id="file-import-config" accept=".json" style="display:none;">
                         </div>
                     </div>
@@ -254,7 +260,8 @@
 
                     <div class="setting-card">
                         <h3>Servidores Configurados</h3>
-                        <div id="mcp-server-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+                        <div id="mcp-server-list"
+                            style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
                             <div class="hint text-center">No hay servidores configurados</div>
                         </div>
                         <button id="btn-add-mcp" class="icon-btn full-width"
@@ -280,7 +287,8 @@
                         <div id="mcp-stdio-fields">
                             <div class="form-group"><label>Comando (ej. npx)</label><input type="text" id="mcp-cmd"
                                     placeholder="npx"></div>
-                            <div class="form-group"><label>Argumentos (JSON Array)</label><textarea id="mcp-args" rows="2"
+                            <div class="form-group"><label>Argumentos (JSON Array)</label><textarea id="mcp-args"
+                                    rows="2"
                                     placeholder='["-y", "@modelcontextprotocol/server-filesystem", "."]'></textarea>
                             </div>
                         </div>
@@ -307,7 +315,8 @@
                             <div class="form-group"><label>Tipografía</label><input type="text" data-key="fontFamily"
                                     placeholder="Default"></div>
                         </div>
-                        <div class="form-group"><label>Avatar Usuario (URL)</label><input type="text" data-key="userAvatar">
+                        <div class="form-group"><label>Avatar Usuario (URL)</label><input type="text"
+                                data-key="userAvatar">
                         </div>
                         <div class="form-group"><label>Avatar Bot (URL)</label><input type="text" data-key="botAvatar">
                         </div>
@@ -356,7 +365,7 @@
                             <div class="form-group switch-wrapper-col">
                                 <label>Persistencia</label>
                                 <label class="switch"><input type="checkbox" data-key="persistHistory" checked><span
-                                    class="slider round"></span></label>
+                                        class="slider round"></span></label>
                             </div>
                         </div>
                     </div>
@@ -371,16 +380,16 @@
                             </select>
                         </div>
                         <div class="grid-2">
-                            <div class="form-group"><label>Eta</label><input type="number" step="0.1" data-key="mirostatEta"
-                                    value="0.1"></div>
-                            <div class="form-group"><label>Tau</label><input type="number" step="0.1" data-key="mirostatTau"
-                                    value="5.0"></div>
+                            <div class="form-group"><label>Eta</label><input type="number" step="0.1"
+                                    data-key="mirostatEta" value="0.1"></div>
+                            <div class="form-group"><label>Tau</label><input type="number" step="0.1"
+                                    data-key="mirostatTau" value="5.0"></div>
                         </div>
                     </div>
 
                     <button id="btn-reset" class="danger-btn">⚠️ Restaurar Valores de Fábrica</button>
                 </div>
-                
+
                 <!-- Common Actions for all tabs -->
                 <button id="save-settings" class="save-btn">Guardar Todas las Configuraciones</button>
             </div>
@@ -408,13 +417,15 @@
             <div id="quick-actions" class="quick-actions">
                 <div class="chip" data-prompt="Resume esta página web en 3 puntos clave">📝 Resumir Página</div>
                 <div class="chip" data-prompt="Explica este código paso a paso">💻 Explicar Código</div>
-                <div class="chip" data-prompt="Corrige la gramática y mejora el estilo del siguiente texto:">✨ Mejorar Texto</div>
+                <div class="chip" data-prompt="Corrige la gramática y mejora el estilo del siguiente texto:">✨ Mejorar
+                    Texto</div>
                 <div class="chip" data-prompt="Traduce esto al inglés:">🌐 Traducir a Inglés</div>
             </div>
 
             <div id="img-preview-container" style="display:none; padding-bottom:8px;">
                 <div style="position:relative; display:inline-block;">
-                    <img id="img-preview" src="" style="height:60px; border-radius:6px; border:1px solid var(--accent);">
+                    <img id="img-preview" src=""
+                        style="height:60px; border-radius:6px; border:1px solid var(--accent);">
                     <button id="btn-clear-img"
                         style="position:absolute; top:-6px; right:-6px; background:red; color:white; border-radius:50%; border:none; width:16px; height:16px; font-size:10px; cursor:pointer;">×</button>
                 </div>
@@ -434,7 +445,8 @@
                     </svg>
                 </button>
                 <textarea id="chat-input" placeholder="Pregunta algo..." rows="1"></textarea>
-                <button id="btn-voice-input" class="icon-btn" title="Dictar por voz" style="margin: 0 4px; color: var(--text-secondary);">
+                <button id="btn-voice-input" class="icon-btn" title="Dictar por voz"
+                    style="margin: 0 4px; color: var(--text-secondary);">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>

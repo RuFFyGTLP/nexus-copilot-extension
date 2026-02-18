@@ -80,37 +80,49 @@ app.post('/api/ai/chat', async (req, res) => {
     try {
         const {
             message,
+            messages: structuredMessages,
             model = DEFAULT_MODEL,
             temperature = 0.7,
             image,
             mcpServers = []
         } = req.body;
 
-        if (!message) {
-            return res.status(400).json({ success: false, error: 'Message is required' });
+        if (!message && (!structuredMessages || structuredMessages.length === 0)) {
+            return res.status(400).json({ success: false, error: 'Message or messages array is required' });
         }
 
         console.log(`\n🤖 Chat Request → Model: ${model} | Temp: ${temperature}`);
-        console.log(`   Message length: ${message.length} chars`);
+        if (structuredMessages) console.log(`   📨 Structured messages: ${structuredMessages.length}`);
+        else console.log(`   Message length: ${message.length} chars`);
         if (image) console.log(`   📸 Image attached`);
         if (mcpServers.length > 0) console.log(`   🔌 MCP Servers: ${mcpServers.length}`);
 
-        // Build Ollama request
+        // Build Ollama request — prefer structured messages if available
+        let ollamaMessages;
+        if (structuredMessages && structuredMessages.length > 0) {
+            // Use structured messages directly (preserves system/user/assistant roles)
+            ollamaMessages = structuredMessages;
+        } else {
+            // Fallback: wrap plain message as single user message
+            ollamaMessages = [{ role: 'user', content: message }];
+        }
+
         const ollamaPayload = {
             model: model,
-            messages: [
-                { role: 'user', content: message }
-            ],
+            messages: ollamaMessages,
             stream: false,
             options: {
                 temperature: temperature
             }
         };
 
-        // Attach image if present (base64)
+        // Attach image if present (base64) — find last user message
         if (image) {
             const base64Data = image.includes(',') ? image.split(',')[1] : image;
-            ollamaPayload.messages[0].images = [base64Data];
+            const lastUserMsg = [...ollamaPayload.messages].reverse().find(m => m.role === 'user');
+            if (lastUserMsg) {
+                lastUserMsg.images = [base64Data];
+            }
         }
 
         const startTime = Date.now();

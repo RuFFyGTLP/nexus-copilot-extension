@@ -15,6 +15,12 @@ let abortController = null;
 /** @type {string|null} Base64 screenshot currently attached */
 let currentImage = null;
 
+/** @type {number} Current tool recursion depth to prevent infinite loops */
+let toolDepth = 0;
+
+/** Maximum allowed tool call recursions per user message */
+const MAX_TOOL_DEPTH = 3;
+
 // ─── Toast Notification ─────────────────────────────────────────────────────
 
 /**
@@ -49,7 +55,7 @@ export function showToast(msg, type = 'info') {
 
 /**
  * Builds the conversation context from rendered messages in the DOM.
- * @returns {string} Formatted conversation history
+ * @returns {string} Formatted conversation history as plain text
  */
 export function getConversationContext() {
     const allMsgs = document.querySelectorAll('#chat-messages .message');
@@ -72,6 +78,31 @@ export function getConversationContext() {
         }
     });
     return context;
+}
+
+/**
+ * Builds structured message array from DOM messages for OpenAI-compatible APIs.
+ * Used by Ollama and LM Studio providers that expect [{role, content}] format.
+ * @param {number} [limit=20] - Max messages to include
+ * @returns {Array<{role: string, content: string}>}
+ */
+function getStructuredMessages(limit = 20) {
+    const allMsgs = document.querySelectorAll('#chat-messages .message');
+    const messages = [];
+    allMsgs.forEach(msg => {
+        const bubble = msg.querySelector('.bubble');
+        if (!bubble) return;
+        const text = bubble.innerText.replace('Generando...', '').trim();
+        if (!text || text.includes('Pensando...')) return;
+
+        let role = 'user';
+        if (msg.classList.contains('assistant')) role = 'assistant';
+        else if (msg.classList.contains('system')) role = 'system';
+
+        messages.push({ role, content: text });
+    });
+    // Return the latest N messages to stay within context window
+    return messages.slice(-limit);
 }
 
 // ─── Message Rendering ──────────────────────────────────────────────────────
@@ -197,11 +228,17 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
     /**
      * Sends a message to the configured AI provider.
      * @param {string|null} textOverride - If provided, used instead of input value (e.g., tool output)
+     * @param {boolean} isToolFollowUp - Whether this call is a follow-up after a tool execution
      */
-    async function sendMessage(textOverride = null) {
+    async function sendMessage(textOverride = null, isToolFollowUp = false) {
         if (!chatInput) return;
         const text = textOverride || chatInput.value.trim();
         if (!text) return;
+
+        // Reset tool depth on fresh user messages
+        if (!textOverride) {
+            toolDepth = 0;
+        }
 
         let config = DEFAULTS;
         let endpoint = '';
@@ -240,24 +277,43 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
                 systemInstruction += `\n\n[RESPONSE STYLE]\nUse a ${config.responseStyle} tone/style.`;
             }
 
-            // Inject Agent Tools Prompt
-            systemInstruction += '\n\n' + AGENT_TOOLS_PROMPT;
+            // BUG FIX #4: Only inject Agent Tools Prompt when NOT in a tool follow-up
+            // and when tool depth allows more calls
+            const canUseTool = toolDepth < MAX_TOOL_DEPTH;
+            if (canUseTool && !isToolFollowUp) {
+                systemInstruction += '\n\n' + AGENT_TOOLS_PROMPT;
+            } else if (isToolFollowUp) {
+                systemInstruction += '\n\n[IMPORTANT] You have already used a tool and received the result below. DO NOT call any more tools. Use the tool result to answer the user\'s original question directly. Respond in a natural, helpful way.';
+            }
 
             // Build Conversation History
             let fullConversation = getConversationContext();
+            const historyMessages = getStructuredMessages(config.historyLimit || 20);
 
             if (textOverride) {
-                fullConversation += `System: [TOOL RESULT]\n${textOverride}\n\nUser: Ahora continúa respondiendo a mi petición original usando esta información.\n\n`;
+                fullConversation += `System: [TOOL RESULT]\n${textOverride}\n\nAssistant: `;
             }
 
             // ── Provider-specific payload ──
             if (provider === 'nexus') {
                 endpoint += '/api/ai/chat';
                 const mcpData = await new Promise(r => chrome.storage.sync.get({ mcpServers: [], enableMcp: false }, r));
-                const finalPrompt = systemInstruction ? `System: ${systemInstruction}\n\n${fullConversation}` : fullConversation;
+
+                // Build messages array with system + history
+                const nexusMessages = [
+                    ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+                    ...historyMessages
+                ];
+
+                // CRITICAL FIX: If this is a tool result, add it to the messages array
+                // so the AI actually receives the page content / tool output
+                if (textOverride) {
+                    nexusMessages.push({ role: 'user', content: textOverride });
+                }
 
                 payload = {
-                    message: finalPrompt,
+                    message: text,
+                    messages: nexusMessages,
                     model: config.model,
                     reasoningModel: config.reasoningModel,
                     temperature: config.temperature,
@@ -265,26 +321,59 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
                     mcpServers: mcpData.enableMcp ? mcpData.mcpServers : []
                 };
             } else if (provider === 'ollama') {
+                // BUG FIX #2: Include full conversation history for Ollama
                 endpoint += '/api/chat';
+                const ollamaMessages = [
+                    ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+                    ...historyMessages
+                ];
+
+                // If this is a tool result, add it as context
+                if (textOverride) {
+                    ollamaMessages.push({ role: 'user', content: textOverride });
+                }
+
+                // Add image to the last user message if present
+                if (currentImage) {
+                    const lastUserMsg = [...ollamaMessages].reverse().find(m => m.role === 'user');
+                    if (lastUserMsg) {
+                        lastUserMsg.images = [currentImage.split(',')[1]];
+                    }
+                }
+
                 payload = {
                     model: config.model,
-                    messages: [
-                        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
-                        { role: 'user', content: text, images: currentImage ? [currentImage.split(',')[1]] : undefined }
-                    ],
+                    messages: ollamaMessages,
                     stream: false,
                     options: { temperature: config.temperature }
                 };
             } else if (provider === 'lmstudio') {
+                // BUG FIX #2: Include full conversation history for LM Studio
                 endpoint += '/v1/chat/completions';
-                let content = text;
-                if (currentImage) content = [{ type: "text", text }, { type: "image_url", image_url: { url: currentImage } }];
+                const lmMessages = [
+                    ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+                    ...historyMessages
+                ];
+
+                // If this is a tool result, add it as context
+                if (textOverride) {
+                    lmMessages.push({ role: 'user', content: textOverride });
+                }
+
+                // Handle image for the last user message (OpenAI vision format)
+                if (currentImage) {
+                    const lastUserMsg = [...lmMessages].reverse().find(m => m.role === 'user');
+                    if (lastUserMsg) {
+                        lastUserMsg.content = [
+                            { type: 'text', text: lastUserMsg.content },
+                            { type: 'image_url', image_url: { url: currentImage } }
+                        ];
+                    }
+                }
+
                 payload = {
                     model: config.model,
-                    messages: [
-                        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
-                        { role: 'user', content }
-                    ],
+                    messages: lmMessages,
                     temperature: config.temperature,
                     stream: false
                 };
@@ -332,35 +421,44 @@ export function initChat({ chatInput, messagesEl, btnStop }) {
                 addMessage(messagesEl, 'assistant', replyText, false, config);
 
                 // ── Check for Tool Call in response ──
-                const toolRegex = /```json\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```/;
-                const match = replyText.match(toolRegex);
+                // BUG FIX #1: Only attempt tool detection if we haven't exceeded depth limit
+                if (toolDepth < MAX_TOOL_DEPTH) {
+                    // Flexible regex: supports with or without markdown backticks
+                    const toolRegex = /```json\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```|(\{[\s\S]*?"tool"\s*:\s*"[\w_]+"[\s\S]*?\})/;
+                    const match = replyText.match(toolRegex);
+                    const jsonContent = match ? (match[1] || match[2]) : null;
 
-                if (match && match[1]) {
-                    try {
-                        const toolCall = JSON.parse(match[1]);
-                        if (toolCall.tool) {
-                            showToast(`🛠️ Ejecutando: ${toolCall.tool}...`, 'info');
-                            const result = await executeTool(
-                                toolCall.tool,
-                                toolCall.params || {},
-                                (reason) => {
-                                    // Security block callback
-                                    addMessage(messagesEl, 'system', reason, false, config);
+                    if (jsonContent) {
+                        try {
+                            const toolCall = JSON.parse(jsonContent);
+                            if (toolCall.tool) {
+                                toolDepth++;
+                                console.log(`[Nexus Tools] Depth: ${toolDepth}/${MAX_TOOL_DEPTH} — Executing: ${toolCall.tool}`);
+                                showToast(`🛠️ Ejecutando: ${toolCall.tool}... (${toolDepth}/${MAX_TOOL_DEPTH})`, 'info');
+
+                                const result = await executeTool(
+                                    toolCall.tool,
+                                    toolCall.params || {},
+                                    (reason) => {
+                                        addMessage(messagesEl, 'system', reason, false, config);
+                                    }
+                                );
+
+                                if (result.blocked) {
+                                    addMessage(messagesEl, 'system', `🔒 ${result.error}`, false, config);
+                                } else {
+                                    // Send the result back with explicit instruction to NOT call more tools
+                                    const outputMsg = `[TOOL RESULT for '${toolCall.tool}']:\n${JSON.stringify(result.result || result, null, 2)}\n\n[INSTRUCTION] Now use this information to respond to the user's original request. Do NOT call any more tools.`;
+                                    setTimeout(() => sendMessage(outputMsg, true), 800);
                                 }
-                            );
-
-                            if (result.blocked) {
-                                // Security blocked - don't recurse, show message
-                                addMessage(messagesEl, 'system', `🔒 ${result.error}`, false, config);
-                            } else {
-                                const outputMsg = `Tool '${toolCall.tool}' Output:\n${JSON.stringify(result, null, 2)}`;
-                                setTimeout(() => sendMessage(outputMsg), 1000);
                             }
+                        } catch (e) {
+                            console.error("Tool parse error", e);
+                            showToast('Error al procesar herramienta', 'error');
                         }
-                    } catch (e) {
-                        console.error("Tool parse error", e);
-                        showToast('Error al procesar herramienta', 'error');
                     }
+                } else if (toolDepth >= MAX_TOOL_DEPTH) {
+                    console.warn(`[Nexus Tools] Max tool depth (${MAX_TOOL_DEPTH}) reached. Stopping tool execution.`);
                 }
 
             } else {

@@ -13,7 +13,7 @@ services:
     container_name: nexus-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "11434:11434" # Puerto estándar de Ollama
     volumes:
       - ollama_data:/root/.ollama
     environment:

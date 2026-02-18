@@ -21,7 +21,7 @@ services:
     container_name: nexus-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "11434:11434" # Puerto estándar de Ollama
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -66,7 +66,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=http://ollama:11434 # Red interna de Docker
       - DEFAULT_MODEL=qwen2.5-coder:3b
       - CORS_ORIGIN=*
     depends_on:
